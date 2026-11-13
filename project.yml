@@ -1,0 +1,105 @@
+name: CarMirror
+
+options:
+  deploymentTarget:
+    iOS: "17.0"
+
+settings:
+  base:
+    # ---- Change these three to your own values ----
+    DEVELOPMENT_TEAM: BG4DUW42YR                       # your Apple Team ID
+    APP_BUNDLE_ID: com.pradeepkommuri.CarMirror         # must be unique to you
+    APP_GROUP: group.com.pradeepkommuri.carmirror       # must start with "group."
+    # -----------------------------------------------
+    SWIFT_VERSION: "5.9"
+    # Keep code in the main binaries. With Xcode's debug dylib, the broadcast
+    # extension's principal class lives in a side dylib.
+    ENABLE_DEBUG_DYLIB: NO
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"
+
+targets:
+  CarMirror:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: CarMirror
+        AppGroup: $(APP_GROUP)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [audio]           # keeps AirPlay video running while you use other apps
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true      # plain HTTP to the local stream server
+        NSLocalNetworkUsageDescription: CarMirror serves your screen stream to the car display over your local network.
+    entitlements:
+      path: App/CarMirror.entitlements
+      properties:
+        com.apple.security.application-groups: [$(APP_GROUP)]
+    dependencies:
+      - target: BroadcastExtension
+
+  BroadcastExtension:
+    type: app-extension
+    platform: iOS
+    sources: [BroadcastExtension, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).Broadcast
+    info:
+      path: BroadcastExtension/Info.plist
+      properties:
+        CFBundleDisplayName: CarMirror
+        AppGroup: $(APP_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.broadcast-services-upload
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).SampleHandler
+          RPBroadcastProcessMode: RPBroadcastProcessModeSampleBuffer
+    entitlements:
+      path: BroadcastExtension/BroadcastExtension.entitlements
+      properties:
+        com.apple.security.application-groups: [$(APP_GROUP)]
+
+  CarMirrorTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/Unit
+      # Extension + shared code compiled in so it can be tested in the host app process.
+      - BroadcastExtension/HLSSegmenter.swift
+      - BroadcastExtension/SampleHandler.swift
+      - Shared/Shared.swift
+      - App/LocalHLSServer.swift
+      - App/NetworkInfo.swift
+    dependencies:
+      - target: CarMirror
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).Tests
+        GENERATE_INFOPLIST_FILE: YES
+
+  CarMirrorUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests/UI]
+    dependencies:
+      - target: CarMirror
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).UITests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  CarMirror:
+    build:
+      targets:
+        CarMirror: all
+    test:
+      targets:
+        - CarMirrorTests
+        - CarMirrorUITests
